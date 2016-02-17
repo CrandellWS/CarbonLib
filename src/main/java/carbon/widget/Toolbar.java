@@ -2,6 +2,7 @@ package carbon.widget;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -77,6 +78,17 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
         initToolbar(attrs, defStyleAttr);
     }
 
+    private static Activity scanForActivity(Context cont) {
+        if (cont == null)
+            return null;
+        else if (cont instanceof Activity)
+            return (Activity)cont;
+        else if (cont instanceof ContextWrapper)
+            return scanForActivity(((ContextWrapper)cont).getBaseContext());
+
+        return null;
+    }
+
     private void initToolbar(AttributeSet attrs, int defStyleAttr) {
         inflate(getContext(), R.layout.carbon_toolbar, this);
         content = (ViewGroup) findViewById(R.id.carbon_toolbarContent);
@@ -86,7 +98,7 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
         icon.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                ((Activity) getContext()).onBackPressed();
+                scanForActivity(getContext()).onBackPressed();
             }
         });
 
