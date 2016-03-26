@@ -1,6 +1,7 @@
 package carbon.drawable;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -23,6 +24,7 @@ public class CircularProgressDrawable extends ProgressDrawable {
 
     public CircularProgressDrawable() {
         forePaint.setStyle(Paint.Style.STROKE);
+        forePaint.setColor(Color.WHITE);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package carbon.drawable;
+package carbon.drawable.ripple;
 
 /**
  * Created by Marcin on 2015-02-16.

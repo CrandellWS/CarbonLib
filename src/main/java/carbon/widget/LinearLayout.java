@@ -39,9 +39,10 @@ import carbon.animation.AnimUtils;
 import carbon.animation.AnimatedView;
 import carbon.animation.StateAnimator;
 import carbon.drawable.EmptyDrawable;
-import carbon.drawable.RippleDrawable;
-import carbon.drawable.RippleView;
+import carbon.drawable.ripple.RippleDrawable;
+import carbon.drawable.ripple.RippleView;
 import carbon.internal.ElevationComparator;
+import carbon.internal.MatrixHelper;
 import carbon.internal.PercentLayoutHelper;
 import carbon.shadow.Shadow;
 import carbon.shadow.ShadowGenerator;
@@ -58,9 +59,8 @@ import static com.nineoldandroids.view.animation.AnimatorProxy.wrap;
  * corners, insets, custom drawing order, touch margins, state animators and others.
  */
 public class LinearLayout extends android.widget.LinearLayout implements ShadowView, RippleView, TouchMarginView, StateAnimatorView, AnimatedView, InsetView, CornerView, MaxSizeView {
-
-    private boolean debugMode;
     private final PercentLayoutHelper percentLayoutHelper = new PercentLayoutHelper(this);
+    private OnTouchListener onDispatchTouchListener;
 
     public LinearLayout(Context context) {
         super(context, null);
@@ -97,12 +97,6 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
             setCornerRadius((int) a.getDimension(R.styleable.LinearLayout_carbon_cornerRadius, 0));
 
             a.recycle();
-
-            if (isInEditMode()) {
-                a = getContext().obtainStyledAttributes(attrs, R.styleable.Carbon, defStyleAttr, 0);
-                debugMode = a.getBoolean(R.styleable.Carbon_carbon_debugMode, false);
-                a.recycle();
-            }
         }
 
         setChildrenDrawingOrderEnabled(true);
@@ -138,9 +132,6 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
             if (insetBottom != 0)
                 canvas.drawRect(0, getHeight() - insetBottom, getWidth(), getHeight(), paint);
         }
-
-        if (debugMode)
-            Carbon.drawDebugInfo(this, canvas);
     }
 
     @Override
@@ -156,26 +147,11 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
 
                 float childElevation = shadowView.getElevation() + shadowView.getTranslationZ();
 
-                float[] childLocation = new float[]{(child.getLeft() + child.getRight()) / 2, (child.getTop() + child.getBottom()) / 2};
-                Matrix matrix = carbon.internal.ViewHelper.getMatrix(child);
-                matrix.mapPoints(childLocation);
-
-                int[] location = new int[2];
-                getLocationOnScreen(location);
-                float x = childLocation[0] + location[0];
-                float y = childLocation[1] + location[1];
-                x -= getRootView().getWidth() / 2;
-                y += getRootView().getHeight() / 2;   // looks nice
-                float length = (float) Math.sqrt(x * x + y * y);
-
                 int saveCount = canvas.save(Canvas.MATRIX_SAVE_FLAG);
-                canvas.translate(
-                        x / length * childElevation / 2,
-                        y / length * childElevation / 2);
-                canvas.translate(
-                        child.getLeft(),
-                        child.getTop());
+                canvas.translate(0, childElevation / 2);
+                canvas.translate(child.getLeft(), child.getTop());
 
+                Matrix matrix = MatrixHelper.getMatrix(child);
                 canvas.concat(matrix);
                 shadow.draw(canvas, child, paint);
                 canvas.restoreToCount(saveCount);
@@ -296,6 +272,9 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
         for (int i = 0; i < getChildCount(); i++)
             views.add(getChildAt(i));
         Collections.sort(views, new ElevationComparator());
+
+        if (onDispatchTouchListener != null && onDispatchTouchListener.onTouch(this, event))
+            return true;
 
         if (rippleDrawable != null && event.getAction() == MotionEvent.ACTION_DOWN)
             rippleDrawable.setHotspot(event.getX(), event.getY());
@@ -503,7 +482,6 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
     @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
-        setTranslationZ(enabled ? 0 : -elevation);
     }
 
     @Override
@@ -594,7 +572,7 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
     // animations
     // -------------------------------
 
-    private AnimUtils.Style inAnim, outAnim;
+    private AnimUtils.Style inAnim = AnimUtils.Style.None, outAnim = AnimUtils.Style.None;
     private Animator animator;
 
     public void setVisibility(final int visibility) {
@@ -733,8 +711,12 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
 
 
     // -------------------------------
-    // ViewGroup utils
+    // View utils
     // -------------------------------
+
+    public void setOnDispatchTouchListener(OnTouchListener onDispatchTouchListener) {
+        this.onDispatchTouchListener = onDispatchTouchListener;
+    }
 
     public List<View> findViewsById(int id) {
         List<View> result = new ArrayList<>();
@@ -772,7 +754,7 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
 
 
     // -------------------------------
-    // anchors
+    // layout params
     // -------------------------------
 
     @Override
@@ -863,7 +845,6 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
             super(source);
         }
 
-
         public LayoutParams(android.widget.LinearLayout.LayoutParams source) {
             super((MarginLayoutParams) source);
             gravity = source.gravity;
@@ -884,11 +865,6 @@ public class LinearLayout extends android.widget.LinearLayout implements ShadowV
             }
 
             return percentLayoutInfo;
-        }
-
-        @Override
-        protected void setBaseAttributes(TypedArray a, int widthAttr, int heightAttr) {
-            PercentLayoutHelper.fetchWidthAndHeight(this, a, widthAttr, heightAttr);
         }
 
         public int getAnchorGravity() {

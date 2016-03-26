@@ -5,7 +5,10 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
+import android.support.annotation.NonNull;
 
 import carbon.widget.ProgressBar;
 
@@ -18,8 +21,11 @@ public abstract class ProgressDrawable extends Drawable {
     long sweepDuration = DEFAULT_SWEEP_DURATION;
     long sweepDelay = DEFAULT_SWEEP_OFFSET;
     final long startTime = System.currentTimeMillis();
+
     Paint forePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    ColorStateList barColor = ColorStateList.valueOf(Color.RED);
+    ColorStateList tint = ColorStateList.valueOf(Color.RED);
+    PorterDuff.Mode tintMode;
+
     float width = 5;
     float progress;
     float barPadding;
@@ -44,12 +50,7 @@ public abstract class ProgressDrawable extends Drawable {
     @Override
     public boolean setState(int[] stateSet) {
         boolean result = super.setState(stateSet);
-        updateColors();
         return result;
-    }
-
-    private void updateColors() {
-        forePaint.setColor(barColor.getColorForState(getState(), barColor.getDefaultColor()));
     }
 
     public void setProgress(float progress) {
@@ -92,18 +93,19 @@ public abstract class ProgressDrawable extends Drawable {
         this.style = style;
     }
 
+    @Deprecated
     public ColorStateList getBarColor() {
-        return barColor;
+        return tint;
     }
 
+    @Deprecated
     public void setBarColor(int color) {
-        barColor = ColorStateList.valueOf(color);
-        updateColors();
+        tint = ColorStateList.valueOf(color);
     }
 
+    @Deprecated
     public void setBarColor(ColorStateList barColor) {
-        this.barColor = barColor;
-        updateColors();
+        this.tint = barColor;
     }
 
     public float getBarPadding() {
@@ -112,5 +114,32 @@ public abstract class ProgressDrawable extends Drawable {
 
     public void setBarPadding(float barPadding) {
         this.barPadding = barPadding;
+    }
+
+    public void setTint(ColorStateList list) {
+        tint = list;
+        updateTint();
+    }
+
+    @Override
+    public void setTint(int tintColor) {
+        this.tint = ColorStateList.valueOf(tintColor);
+    }
+
+    @Override
+    public void setTintMode(@NonNull PorterDuff.Mode tintMode) {
+        this.tintMode = tintMode;
+        updateTint();
+    }
+
+    private void updateTint() {
+        if (tint != null && tintMode != null) {
+            int color = tint.getColorForState(getState(), tint.getDefaultColor());
+            setColorFilter(new PorterDuffColorFilter(color, tintMode));
+            setAlpha(Color.alpha(color));
+        } else {
+            setColorFilter(null);
+            setAlpha(255);
+        }
     }
 }

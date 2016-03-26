@@ -35,9 +35,10 @@ import carbon.animation.AnimUtils;
 import carbon.animation.AnimatedView;
 import carbon.animation.StateAnimator;
 import carbon.drawable.EmptyDrawable;
-import carbon.drawable.RippleDrawable;
-import carbon.drawable.RippleView;
+import carbon.drawable.ripple.RippleDrawable;
+import carbon.drawable.ripple.RippleView;
 import carbon.internal.ElevationComparator;
+import carbon.internal.MatrixHelper;
 import carbon.shadow.Shadow;
 import carbon.shadow.ShadowGenerator;
 import carbon.shadow.ShadowShape;
@@ -55,8 +56,6 @@ import static com.nineoldandroids.view.animation.AnimatorProxy.wrap;
  * Created by Marcin on 2015-12-30.
  */
 public class CoordinatorLayout extends android.support.design.widget.CoordinatorLayout implements ShadowView, RippleView, TouchMarginView, StateAnimatorView, AnimatedView, InsetView, CornerView {
-    private boolean debugMode;
-
     public CoordinatorLayout(Context context) {
         super(context);
         initCoordinatorLayout(null, R.attr.carbon_coordinatorLayoutStyle);
@@ -84,12 +83,6 @@ public class CoordinatorLayout extends android.support.design.widget.Coordinator
             setCornerRadius((int) a.getDimension(R.styleable.CoordinatorLayout_carbon_cornerRadius, 0));
 
             a.recycle();
-
-            if (isInEditMode()) {
-                a = getContext().obtainStyledAttributes(attrs, R.styleable.Carbon, defStyleAttr, 0);
-                debugMode = a.getBoolean(R.styleable.Carbon_carbon_debugMode, false);
-                a.recycle();
-            }
         }
 
         setChildrenDrawingOrderEnabled(true);
@@ -125,9 +118,6 @@ public class CoordinatorLayout extends android.support.design.widget.Coordinator
             if (insetBottom != 0)
                 canvas.drawRect(0, getHeight() - insetBottom, getWidth(), getHeight(), paint);
         }
-
-        if (debugMode)
-            Carbon.drawDebugInfo(this, canvas);
     }
 
     @Override
@@ -143,26 +133,11 @@ public class CoordinatorLayout extends android.support.design.widget.Coordinator
 
                 float childElevation = shadowView.getElevation() + shadowView.getTranslationZ();
 
-                float[] childLocation = new float[]{(child.getLeft() + child.getRight()) / 2, (child.getTop() + child.getBottom()) / 2};
-                Matrix matrix = carbon.internal.ViewHelper.getMatrix(child);
-                matrix.mapPoints(childLocation);
-
-                int[] location = new int[2];
-                getLocationOnScreen(location);
-                float x = childLocation[0] + location[0];
-                float y = childLocation[1] + location[1];
-                x -= getRootView().getWidth() / 2;
-                y += getRootView().getHeight() / 2;   // looks nice
-                float length = (float) Math.sqrt(x * x + y * y);
-
                 int saveCount = canvas.save(Canvas.MATRIX_SAVE_FLAG);
-                canvas.translate(
-                        x / length * childElevation / 2,
-                        y / length * childElevation / 2);
-                canvas.translate(
-                        child.getLeft(),
-                        child.getTop());
+                canvas.translate(0, childElevation / 2);
+                canvas.translate(child.getLeft(), child.getTop());
 
+                Matrix matrix = MatrixHelper.getMatrix(child);
                 canvas.concat(matrix);
                 shadow.draw(canvas, child, paint);
                 canvas.restoreToCount(saveCount);
@@ -487,7 +462,6 @@ public class CoordinatorLayout extends android.support.design.widget.Coordinator
     @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
-        setTranslationZ(enabled ? 0 : -elevation);
     }
 
     @Override
@@ -578,7 +552,7 @@ public class CoordinatorLayout extends android.support.design.widget.Coordinator
     // animations
     // -------------------------------
 
-    private AnimUtils.Style inAnim, outAnim;
+    private AnimUtils.Style inAnim = AnimUtils.Style.None, outAnim = AnimUtils.Style.None;
     private Animator animator;
 
     public void setVisibility(final int visibility) {

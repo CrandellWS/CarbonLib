@@ -1,11 +1,13 @@
 package carbon;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -14,11 +16,11 @@ import android.view.ViewGroup;
 
 import carbon.animation.AnimUtils;
 import carbon.animation.AnimatedView;
-import carbon.drawable.RippleDrawable;
-import carbon.drawable.RippleDrawableFroyo;
-import carbon.drawable.RippleDrawableLollipop;
-import carbon.drawable.RippleDrawableMarshmallow;
-import carbon.drawable.RippleView;
+import carbon.drawable.ripple.RippleDrawable;
+import carbon.drawable.ripple.RippleDrawableFroyo;
+import carbon.drawable.ripple.RippleDrawableLollipop;
+import carbon.drawable.ripple.RippleDrawableMarshmallow;
+import carbon.drawable.ripple.RippleView;
 import carbon.shadow.ShadowView;
 import carbon.widget.InsetView;
 import carbon.widget.MaxSizeView;
@@ -51,9 +53,9 @@ public class Carbon {
             return;
 
         TypedArray a = view.getContext().obtainStyledAttributes(attrs, R.styleable.Carbon, defStyleAttr, 0);
-        int color = a.getColor(R.styleable.Carbon_carbon_rippleColor, 0);
+        ColorStateList color = a.getColorStateList(R.styleable.Carbon_carbon_rippleColor);
 
-        if (color != 0) {
+        if (color != null) {
             RippleDrawable.Style style = RippleDrawable.Style.values()[a.getInt(R.styleable.Carbon_carbon_rippleStyle, RippleDrawable.Style.Background.ordinal())];
             boolean useHotspot = a.getBoolean(R.styleable.Carbon_carbon_rippleHotspot, true);
             int radius = (int) a.getDimension(R.styleable.Carbon_carbon_rippleRadius, -1);
@@ -64,14 +66,29 @@ public class Carbon {
         a.recycle();
     }
 
-    public static RippleDrawable createRippleDrawable(int color, RippleDrawable.Style style, View view, boolean useHotspot, int radius) {
+    public static RippleDrawable createRippleDrawable(ColorStateList color, RippleDrawable.Style style, View view, boolean useHotspot, int radius) {
         RippleDrawable rippleDrawable;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             rippleDrawable = new RippleDrawableMarshmallow(color, style == RippleDrawable.Style.Background ? view.getBackground() : null, style);
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             rippleDrawable = new RippleDrawableLollipop(color, style == RippleDrawable.Style.Background ? view.getBackground() : null, style);
         } else {
-            rippleDrawable = new RippleDrawableFroyo(color, style == RippleDrawable.Style.Background ? view.getBackground() : null, view.getContext(), style);
+            rippleDrawable = new RippleDrawableFroyo(color, style == RippleDrawable.Style.Background ? view.getBackground() : null, style);
+        }
+        rippleDrawable.setCallback(view);
+        rippleDrawable.setHotspotEnabled(useHotspot);
+        rippleDrawable.setRadius(radius);
+        return rippleDrawable;
+    }
+
+    public static RippleDrawable createRippleDrawable(ColorStateList color, RippleDrawable.Style style, View view, Drawable background, boolean useHotspot, int radius) {
+        RippleDrawable rippleDrawable;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            rippleDrawable = new RippleDrawableMarshmallow(color, background, style);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            rippleDrawable = new RippleDrawableLollipop(color, background, style);
+        } else {
+            rippleDrawable = new RippleDrawableFroyo(color, background, style);
         }
         rippleDrawable.setCallback(view);
         rippleDrawable.setHotspotEnabled(useHotspot);
@@ -139,6 +156,21 @@ public class Carbon {
                 view.setTint(a.getColorStateList(R.styleable.Carbon_carbon_tint));
             }
         }
+        view.setTintMode(TintedView.modes[a.getInt(R.styleable.Carbon_carbon_tintMode, 1)]);
+
+        if (a.hasValue(R.styleable.Carbon_carbon_backgroundTint)) {
+            TypedValue value = new TypedValue();
+            a.getValue(R.styleable.Carbon_carbon_backgroundTint, value);
+            if (value.type >= TypedValue.TYPE_FIRST_INT && value.type <= TypedValue.TYPE_LAST_INT) {
+                view.setBackgroundTint(value.data);
+            } else {
+                view.setBackgroundTint(a.getColorStateList(R.styleable.Carbon_carbon_backgroundTint));
+            }
+        }
+        view.setBackgroundTintMode(TintedView.modes[a.getInt(R.styleable.Carbon_carbon_backgroundTintMode, 1)]);
+
+        if (a.hasValue(R.styleable.Carbon_carbon_animateColorChanges))
+            view.setAnimateColorChangesEnabled(a.getBoolean(R.styleable.Carbon_carbon_animateColorChanges, false));
 
         a.recycle();
     }
@@ -165,6 +197,14 @@ public class Carbon {
             canvas.drawRect(rect, paint);
         }
 
+        float step = viewGroup.getResources().getDimension(R.dimen.carbon_grid8);
+        paint.setColor(0x7f000000);
+        for (float x = 8.5f; x < viewGroup.getWidth(); x += step) {
+            canvas.drawLine(x, 0, x, viewGroup.getHeight(), paint);
+        }
+        for (float y = 8.5f; y < viewGroup.getHeight(); y += step) {
+            canvas.drawLine(0, y, viewGroup.getWidth(), y, paint);
+        }
     }
 
     public static void initAnimations(AnimatedView view, AttributeSet attrs, int defStyleAttr) {
@@ -189,5 +229,12 @@ public class Carbon {
         TypedValue typedvalueattr = new TypedValue();
         theme.resolveAttribute(attr, typedvalueattr, true);
         return typedvalueattr.resourceId != 0 ? context.getResources().getColor(typedvalueattr.resourceId) : typedvalueattr.data;
+    }
+
+    public static boolean isDebugModeEnabled(Context context) {
+        Resources.Theme theme = context.getTheme();
+        TypedValue typedvalueattr = new TypedValue();
+        theme.resolveAttribute(R.attr.carbon_debugMode, typedvalueattr, true);
+        return typedvalueattr.resourceId != 0 ? context.getResources().getBoolean(typedvalueattr.resourceId) : false;
     }
 }

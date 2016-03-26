@@ -8,8 +8,8 @@ android {
     defaultConfig {
         minSdkVersion 8
         targetSdkVersion 23
-        versionCode 40
-        versionName "0.12.0"
+        versionCode 41
+        versionName "0.13.0"
         renderscriptTargetApi 20
         renderscriptSupportModeEnabled true
     }
@@ -26,11 +26,11 @@ android {
 }
 
 dependencies {
-    compile 'com.android.support:appcompat-v7:23.1.1'
-    compile 'com.android.support:support-v4:23.1.1'
-    compile 'com.android.support:gridlayout-v7:23.1.1'
-    compile 'com.android.support:recyclerview-v7:23.1.1'
+    compile 'com.android.support:appcompat-v7:23.2.1'
+    compile 'com.android.support:support-v4:23.2.1'
+    compile 'com.android.support:gridlayout-v7:23.2.1'
+    compile 'com.android.support:recyclerview-v7:23.2.1'
     compile 'de.greenrobot:androidsvg:1.2.2-beta-1-tweaked-2'
     compile 'com.nineoldandroids:library:2.4.0'
-    compile 'com.android.support:design:23.1.1'
+    compile 'com.android.support:design:23.2.1'
 }

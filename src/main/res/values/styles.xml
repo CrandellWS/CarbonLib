@@ -235,7 +235,6 @@
         <item name="android:paddingRight">@dimen/carbon_paddingHalf</item>
         <item name="android:minHeight">36dp</item>
         <item name="android:minWidth">88dp</item>
-        <item name="android:background">?attr/colorPrimary</item>
         <item name="carbon_elevation">@dimen/carbon_elevationButton</item>
         <item name="carbon_touchMarginTop">6dp</item>
         <item name="carbon_touchMarginBottom">6dp</item>
@@ -243,6 +242,10 @@
         <item name="android:textColor">@null</item>
         <item name="android:textAppearance">?attr/carbon_textAppearanceButtonInverse</item>
         <item name="android:maxLines">1</item>
+        <item name="android:background">@drawable/carbon_buttonbackground</item>
+        <item name="carbon_animateColorChanges">true</item>
+        <item name="carbon_tint">#00000000</item>
+        <item name="carbon_backgroundTint">#00000000</item>
     </style>
 
     <style name="carbon_Button.Flat">
@@ -278,6 +281,7 @@
     <style name="carbon_TextView" parent="@android:style/Widget.TextView">
         <item name="android:textAppearance">?attr/carbon_textAppearanceBody1</item>
         <item name="carbon_rippleColor">@null</item>
+        <item name="carbon_animateColorChanges">true</item>
     </style>
 
     <style name="carbon_CollapsingToolbarLayout">
@@ -318,6 +322,7 @@
         <item name="carbon_icon">@raw/carbon_uparrow</item>
         <item name="contentInsetLeft">0dp</item>
         <item name="contentInsetStart">0dp</item>
+        <item name="android:padding">0dp</item>
     </style>
 
     <style name="carbon_Chip">
@@ -335,6 +340,7 @@
         <item name="carbon_rippleStyle">over</item>
         <item name="carbon_inAnimation">brightnessSaturationFade</item>
         <item name="carbon_outAnimation">brightnessSaturationFade</item>
+        <item name="carbon_animateColorChanges">true</item>
     </style>
 
     <style name="carbon_ImageView.Icon">
@@ -361,6 +367,7 @@
 
     <style name="carbon_RecyclerView" parent="@android:style/Widget.ListView">
         <item name="android:fadingEdge">none</item>
+        <item name="carbon_overScroll">ifContentScrolls</item>
         <item name="carbon_tint">?attr/colorPrimary</item>
     </style>
 
@@ -386,15 +393,19 @@
     <style name="carbon_EditText" parent="@android:style/Widget.EditText">
         <item name="carbon_rippleColor">@null</item>
         <item name="android:textAppearance">?attr/carbon_textAppearanceSubhead</item>
-        <item name="carbon_tint">#00000000</item>
         <item name="android:background">@null</item>
         <item name="carbon_floatingLabel">false</item>
         <item name="android:paddingBottom">16dp</item>
         <item name="carbon_underline">true</item>
         <item name="carbon_cursorColor">?attr/colorAccent</item>
+        <item name="carbon_animateColorChanges">true</item>
+        <item name="carbon_tint">#00000000</item>
+        <item name="carbon_backgroundTint">#00000000</item>
     </style>
 
     <style name="carbon_Spinner" parent="carbon_EditText">
+        <item name="android:cursorVisible">false</item>
+        <item name="android:focusable">false</item>
         <item name="android:editable">false</item>
         <item name="android:maxLines">1</item>
         <item name="android:paddingLeft">@dimen/carbon_padding</item>
@@ -481,13 +492,14 @@
         <item name="carbon_tick">true</item>
         <item name="carbon_tickStep">1</item>
         <item name="carbon_tickColor">?attr/colorControlNormal</item>
+        <item name="carbon_labelFormat">%.0f</item>
     </style>
 
-    <style name="carbon_NavigationView"/>
+    <style name="carbon_NavigationView" />
 
     <style name="carbon_TextView.Tooltip">
         <item name="android:minHeight">@dimen/carbon_tooltipHeight</item>
-        <item name="android:gravity">center_horizontal</item>
+        <item name="android:gravity">center</item>
         <item name="android:paddingLeft">@dimen/carbon_tooltipPadding</item>
         <item name="android:paddingRight">@dimen/carbon_tooltipPadding</item>
         <item name="android:background">@color/carbon_tooltip</item>

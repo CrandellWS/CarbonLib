@@ -6,13 +6,17 @@ import android.content.res.TypedArray;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+
+import com.nineoldandroids.animation.ValueAnimator;
 
 import carbon.Carbon;
 import carbon.R;
 import carbon.animation.AnimUtils;
+import carbon.animation.AnimatedColorStateList;
 import carbon.drawable.ColorStateListDrawable;
-import carbon.drawable.ControlAccentColorStateList;
+import carbon.drawable.DefaultAccentColorStateList;
 
 /**
  * Created by Marcin on 2014-12-04.
@@ -54,9 +58,18 @@ public class FloatingActionButton extends ImageView {
 
             if (a.hasValue(R.styleable.FloatingActionButton_android_background)) {
                 int color = a.getColor(R.styleable.FloatingActionButton_android_background, 0);
-                if (color == 0) {
-                    setBackground(new ColorStateListDrawable(new ControlAccentColorStateList(getContext())));
-                }
+                if (color == 0)
+                    setBackground(new ColorStateListDrawable(AnimatedColorStateList.fromList(new DefaultAccentColorStateList(getContext()), new ValueAnimator.AnimatorUpdateListener() {
+                        @Override
+                        public void onAnimationUpdate(ValueAnimator animation) {
+                            postInvalidate();
+                        }
+                    })));
+            }
+            if (a.hasValue(R.styleable.FloatingActionButton_carbon_menu)) {
+                int resId = a.getResourceId(R.styleable.FloatingActionButton_carbon_menu, 0);
+                if (resId != 0)
+                    setMenu(resId);
             }
 
             a.recycle();
@@ -91,18 +104,28 @@ public class FloatingActionButton extends ImageView {
     public void setMenu(Menu menu) {
         this.menu = menu;
 
-        floatingActionMenu = new FloatingActionMenu(getContext());
-        floatingActionMenu.setMenu(menu);
+        if (menu != null) {
+            floatingActionMenu = new FloatingActionMenu(getContext());
+            floatingActionMenu.setMenu(menu);
 
-        setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                floatingActionMenu.show(FloatingActionButton.this);
-            }
-        });
+            setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    floatingActionMenu.show(FloatingActionButton.this);
+                }
+            });
+        } else {
+            floatingActionMenu = null;
+            setOnClickListener(null);
+        }
     }
 
     public Menu getMenu() {
         return menu;
+    }
+
+    public void setOnMenuItemClickListener(MenuItem.OnMenuItemClickListener listener) {
+        if (floatingActionMenu != null)
+            floatingActionMenu.setOnMenuItemClickListener(listener);
     }
 }

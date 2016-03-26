@@ -8,6 +8,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -16,6 +18,7 @@ import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
+import android.support.v4.view.ViewCompat;
 import android.text.Editable;
 import android.text.TextPaint;
 import android.text.TextWatcher;
@@ -50,9 +53,10 @@ import carbon.animation.AnimatedView;
 import carbon.animation.StateAnimator;
 import carbon.drawable.DefaultColorStateList;
 import carbon.drawable.EmptyDrawable;
-import carbon.drawable.RippleDrawable;
-import carbon.drawable.RippleView;
 import carbon.drawable.VectorDrawable;
+import carbon.drawable.ripple.RippleDrawable;
+import carbon.drawable.ripple.RippleView;
+import carbon.internal.EditTextMenu;
 import carbon.internal.Roboto;
 import carbon.internal.TypefaceUtils;
 
@@ -63,6 +67,11 @@ import static com.nineoldandroids.view.animation.AnimatorProxy.wrap;
  * Created by Marcin on 2015-02-14.
  */
 public class EditText extends android.widget.EditText implements RippleView, TouchMarginView, StateAnimatorView, AnimatedView, TintedView {
+    String[] suggestions = new String[]{"test", "suggestion"};
+
+    private Field mIgnoreActionUpEventField;
+    private Object editor;
+
     public enum LabelStyle {
         Floating, Persistent, Hint
     }
@@ -98,6 +107,9 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
     private float labelFrac = 0;
     private boolean underline = true;
     private boolean valid = true;
+    boolean required = false, showPasswordButtonEnabled, clearButtonEnabled;
+
+    Drawable clearButton, showPasswordButton;
 
     float PADDING_ERROR, PADDING_LABEL;
 
@@ -118,6 +130,15 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         public void afterTextChanged(Editable s) {
             afterFirstInteraction = true;
             validateInternalEvent();
+            try {
+                int start = getSelectionStart() - 1;
+                char c;
+                StringBuilder builder = new StringBuilder();
+                while (start >= 0 && Character.isLetterOrDigit(c = s.charAt(start--))) {
+                    builder.insert(0, c);
+                }
+            } catch (Exception e) {
+            }
         }
     };
 
@@ -180,6 +201,9 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
             if (labelStyle == LabelStyle.Floating && label == null)
                 label = getHint().toString();
             setUnderline(a.getBoolean(R.styleable.EditText_carbon_underline, true));
+            setRequired(a.getBoolean(R.styleable.EditText_carbon_required, false));
+            setShowPasswordButtonEnabled(a.getBoolean(R.styleable.EditText_carbon_showPasswordButton, false));
+            setClearButtonEnabled(a.getBoolean(R.styleable.EditText_carbon_clearButton, false));
 
             a.recycle();
 
@@ -232,7 +256,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         PADDING_ERROR = getResources().getDimension(R.dimen.carbon_paddingHalf);
         PADDING_LABEL = getResources().getDimension(R.dimen.carbon_paddingHalf);
 
-        initActionModeCallback();
+        //initActionModeCallback();
 
         if (isFocused() && getText().length() > 0)
             labelFrac = 1;
@@ -240,6 +264,14 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         initSelectionHandle();
 
         validateInternalEvent();
+    }
+
+    @Override
+    public boolean onTextContextMenuItem(int id) {
+        boolean result = super.onTextContextMenuItem(id);
+        if (id == ID_SELECT_ALL)
+            showContextMenu();
+        return result;
     }
 
     public void setCursorColor(int cursorColor) {
@@ -256,6 +288,48 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
 
     public void setUnderline(boolean drawUnderline) {
         this.underline = drawUnderline;
+    }
+
+    public boolean isRequired() {
+        return required;
+    }
+
+    public void setRequired(boolean required) {
+        this.required = required;
+    }
+
+    public boolean isShowPasswordButtonEnabled() {
+        return showPasswordButtonEnabled;
+    }
+
+    public void setShowPasswordButtonEnabled(boolean b) {
+        this.showPasswordButtonEnabled = b;
+        if (b) {
+            setClearButtonEnabled(false);
+            VectorDrawable vectorDrawable = new VectorDrawable(getResources(), R.raw.carbon_clear);
+            this.showPasswordButton = (Drawable) Carbon.createRippleDrawable(ColorStateList.valueOf(Carbon.getThemeColor(getContext(), R.attr.carbon_rippleColor)), RippleDrawable.Style.Borderless, this, vectorDrawable, false, 0);
+            setCompoundDrawablesWithIntrinsicBounds(null, null, showPasswordButton, null);
+        } else {
+            this.showPasswordButton = null;
+            setCompoundDrawables(null, null, null, null);
+        }
+    }
+
+    public boolean isClearButtonEnabled() {
+        return clearButtonEnabled;
+    }
+
+    public void setClearButtonEnabled(boolean b) {
+        this.clearButtonEnabled = b;
+        if (b) {
+            setShowPasswordButtonEnabled(false);
+            VectorDrawable vectorDrawable = new VectorDrawable(getResources(), R.raw.carbon_visibility_off);
+            clearButton = (Drawable) Carbon.createRippleDrawable(ColorStateList.valueOf(Carbon.getThemeColor(getContext(), R.attr.carbon_rippleColor)), RippleDrawable.Style.Borderless, this, vectorDrawable, false, 0);
+            setCompoundDrawablesWithIntrinsicBounds(null, null, clearButton, null);
+        } else {
+            clearButton = null;
+            setCompoundDrawables(null, null, null, null);
+        }
     }
 
     public String getLabel() {
@@ -298,7 +372,9 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
 
         boolean counterError = afterFirstInteraction && (minCharacters > 0 && s.length() < minCharacters || maxCharacters < Integer.MAX_VALUE && s.length() > maxCharacters);
 
-        valid = !counterError && !drawMatchingViewError && !drawPatternError;
+        boolean requiredError = required && s.length() == 0;
+
+        valid = !counterError && !drawMatchingViewError && !drawPatternError && !requiredError;
 
         refreshDrawableState();
 
@@ -391,6 +467,9 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         if (isInEditMode())
             return;
 
+        CharSequence hint = getHint();
+        if (required && hint.charAt(hint.length() - 1) != '*')
+            setHint(hint + " *");
         int paddingTop = getPaddingTop() + internalPaddingTop;
         int paddingBottom = getPaddingBottom() + internalPaddingBottom;
 
@@ -402,7 +481,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         if (underline) {
             //if (isEnabled()) {
             //paint.setShader(null);
-            paint.setColor(tint.getColorForState(getDrawableState(), tint.getDefaultColor()));
+            paint.setColor(backgroundTint.getColorForState(getDrawableState(), backgroundTint.getDefaultColor()));
             canvas.drawLine(getScrollX() + getPaddingLeft(), getHeight() - paddingBottom + DIVIDER_PADDING, getScrollX() + getWidth() - getPaddingRight(), getHeight() - paddingBottom + DIVIDER_PADDING, paint);
          /*   } else {
                 Matrix matrix = new Matrix();
@@ -418,12 +497,25 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
             canvas.drawText(errorMessage, getScrollX() + getPaddingLeft(), getHeight() - paddingBottom + DIVIDER_PADDING + PADDING_ERROR + errorPaint.getTextSize(), errorPaint);
 
         if (label != null) {
-            labelPaint.setColor(tint.getColorForState(getDrawableState(), tint.getDefaultColor()));
             if (labelStyle == LabelStyle.Floating) {
+                labelPaint.setColor(tint.getColorForState(getDrawableState(), tint.getDefaultColor()));
                 labelPaint.setAlpha((int) (255 * labelFrac));
                 canvas.drawText(label, getScrollX() + getPaddingLeft(), paddingTop + labelPaint.getTextSize() * (1 - labelFrac) - PADDING_LABEL, labelPaint);
+                if (required && !valid) {
+                    float off = labelPaint.measureText(label + " ");
+                    labelPaint.setColor(tint.getColorForState(new int[]{R.attr.carbon_state_invalid}, tint.getDefaultColor()));
+                    labelPaint.setAlpha((int) (255 * labelFrac));
+                    canvas.drawText("*", getScrollX() + getPaddingLeft() + off, paddingTop + labelPaint.getTextSize() * (1 - labelFrac) - PADDING_LABEL, labelPaint);
+                }
             } else if (labelStyle == LabelStyle.Persistent) {
+                labelPaint.setColor(tint.getColorForState(getDrawableState(), tint.getDefaultColor()));
                 canvas.drawText(label, getScrollX() + getPaddingLeft(), paddingTop - PADDING_LABEL, labelPaint);
+                if (required && !valid) {
+                    float off = labelPaint.measureText(label + " ");
+                    labelPaint.setColor(tint.getColorForState(new int[]{R.attr.carbon_state_invalid}, tint.getDefaultColor()));
+                    labelPaint.setAlpha((int) (255 * labelFrac));
+                    canvas.drawText("*", getScrollX() + getPaddingLeft() + off, paddingTop - PADDING_LABEL, labelPaint);
+                }
             }
         }
 
@@ -564,6 +656,10 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         return super.getPaddingTop() - internalPaddingTop;
     }
 
+    int getInternalPaddingTop() {
+        return internalPaddingTop;
+    }
+
     @Override
     public void setPadding(int left, int top, int right, int bottom) {
         super.setPadding(left, top + internalPaddingTop, right, bottom + internalPaddingBottom);
@@ -575,7 +671,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
     // -------------------------------
 
 
-    EditorMenu popupMenu;
+    EditTextMenu popupMenu;
     private boolean isShowingPopup = false;
     WindowManager brokenWindowManager = new WindowManager() {
         @Override
@@ -647,12 +743,71 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         return super.getSelectionStart();
     }
 
+    @Override
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    public ActionMode startActionMode(final ActionMode.Callback callback) {
+        ActionMode.Callback c = new ActionMode.Callback() {
+
+            public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                return callback.onPrepareActionMode(mode, menu);
+                //createMenu(menu);
+            }
+
+            public void onDestroyActionMode(ActionMode mode) {
+                popupMenu.dismiss();
+                callback.onDestroyActionMode(mode);
+            }
+
+            public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                return callback.onCreateActionMode(mode, menu);
+            }
+
+            public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                return callback.onActionItemClicked(mode, item);
+            }
+        };
+        return super.startActionMode(c);
+    }
+
+    @Override
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    public ActionMode startActionMode(final ActionMode.Callback callback, int type) {
+        ActionMode.Callback c = new ActionMode.Callback() {
+
+            public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                prepareMenu();
+                return true;
+            }
+
+            public void onDestroyActionMode(ActionMode mode) {
+                callback.onDestroyActionMode(mode);
+            }
+
+            public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                //              mode.setCustomView(new View(getContext()));
+//                callback.onCreateActionMode(mode, menu);
+                callback.onCreateActionMode(mode, menu);
+                createMenu(menu);
+                menu.clear();
+                return true;//
+            }
+
+            public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                return callback.onActionItemClicked(mode, item);
+            }
+        };
+        return super.startActionMode(c, type);
+    }
+
     private void initSelectionHandle() {
         if (android.os.Build.VERSION.SDK_INT >= 11) {
             try {
                 final Field fEditor = android.widget.TextView.class.getDeclaredField("mEditor");
                 fEditor.setAccessible(true);
-                final Object editor = fEditor.get(this);
+                editor = fEditor.get(this);
+
+                mIgnoreActionUpEventField = editor.getClass().getDeclaredField("mIgnoreActionUpEvent");
+                mIgnoreActionUpEventField.setAccessible(true);
 
                 final Field fSelectHandleLeft = editor.getClass().getDeclaredField("mSelectHandleLeft");
                 final Field fSelectHandleRight = editor.getClass().getDeclaredField("mSelectHandleRight");
@@ -714,27 +869,8 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
                 }
 
                 public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-                    TypedValue outValue = new TypedValue();
-                    getContext().getTheme().resolveAttribute(R.attr.carbon_editMenuTheme, outValue, true);
-                    int theme = outValue.resourceId;
-                    Context themedContext = new ContextThemeWrapper(getContext(), theme);
-
-                    popupMenu = new EditorMenu(themedContext);
-                    popupMenu.setOnDismissListener(new PopupWindow.OnDismissListener() {
-                        @Override
-                        public void onDismiss() {
-                            isShowingPopup = false;
-                        }
-                    });
-                    popupMenu.initCopy(menu.findItem(ID_COPY));
-                    popupMenu.initCut(menu.findItem(ID_CUT));
-                    popupMenu.initPaste(menu.findItem(ID_PASTE));
-                    popupMenu.initSelectAll(menu.findItem(ID_SELECT_ALL));
-                    if (popupMenu.hasVisibleItems()) {
-                        popupMenu.show(EditText.this);
-                        isShowingPopup = true;
-                    }
-                    return false;
+                    createMenu(menu);
+                    return true;
                 }
 
                 public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
@@ -742,22 +878,53 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
                 }
             });
         }
-    }
+        if (Build.VERSION.SDK_INT >= 23) {
+            setCustomInsertionActionModeCallback(new ActionMode.Callback() {
+                @Override
+                public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                    createMenu(menu);
 
-    @Override
-    public boolean showContextMenu() {
-        super.showContextMenu();
-        return true;
+                    return true;
+                }
+
+                @Override
+                public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                    return false;
+                }
+
+                @Override
+                public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                    return false;
+                }
+
+                @Override
+                public void onDestroyActionMode(ActionMode mode) {
+
+                }
+            });
+        }
     }
 
     @Override
     protected void onCreateContextMenu(ContextMenu menu) {
+        super.onCreateContextMenu(menu);
+        //createMenu(menu);
+    }
+
+    private void prepareMenu() {
+        if (popupMenu.hasVisibleItems()) {
+            popupMenu.show(EditText.this);
+            isShowingPopup = true;
+        }
+    }
+
+    private void createMenu(Menu menu) {
         TypedValue outValue = new TypedValue();
         getContext().getTheme().resolveAttribute(R.attr.carbon_editMenuTheme, outValue, true);
         int theme = outValue.resourceId;
         Context themedContext = new ContextThemeWrapper(getContext(), theme);
 
-        popupMenu = new EditorMenu(themedContext);
+        popupMenu = new EditTextMenu(themedContext);
         popupMenu.setOnDismissListener(new PopupWindow.OnDismissListener() {
             @Override
             public void onDismiss() {
@@ -765,16 +932,16 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
             }
         });
 
-        super.onCreateContextMenu(menu);
         popupMenu.initCopy(menu.findItem(ID_COPY));
         popupMenu.initCut(menu.findItem(ID_CUT));
         popupMenu.initPaste(menu.findItem(ID_PASTE));
         popupMenu.initSelectAll(menu.findItem(ID_SELECT_ALL));
-        if (popupMenu.hasVisibleItems()) {
-            popupMenu.show(EditText.this);
-            isShowingPopup = true;
-        }
-        menu.clear();
+        //menu.clear();
+        /*try {
+            mIgnoreActionUpEventField.set(editor, true);
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }*/
     }
 
     @Override
@@ -811,7 +978,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         SavedState ss = new SavedState(superState);
         //end
 
-        ss.stateToSave = this.isShowingPopup ? 1 : 0;
+        ss.isShowingPopup = this.isShowingPopup ? 1 : 0;
 
         return ss;
     }
@@ -828,14 +995,14 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         super.onRestoreInstanceState(ss.getSuperState());
         //end
 
-        this.isShowingPopup = ss.stateToSave > 0;
+        this.isShowingPopup = ss.isShowingPopup > 0;
     }
 
     static class SavedState implements Parcelable {
         public static final SavedState EMPTY_STATE = new SavedState() {
         };
 
-        int stateToSave;
+        int isShowingPopup;
 
         Parcelable superState;
 
@@ -850,7 +1017,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         private SavedState(Parcel in) {
             Parcelable superState = in.readParcelable(EditText.class.getClassLoader());
             this.superState = superState != null ? superState : EMPTY_STATE;
-            this.stateToSave = in.readInt();
+            this.isShowingPopup = in.readInt();
         }
 
         @Override
@@ -858,11 +1025,10 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
             return 0;
         }
 
-
         @Override
         public void writeToParcel(@NonNull Parcel out, int flags) {
             out.writeParcelable(superState, flags);
-            out.writeInt(this.stateToSave);
+            out.writeInt(this.isShowingPopup);
         }
 
         public Parcelable getSuperState() {
@@ -889,6 +1055,17 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
 
     private RippleDrawable rippleDrawable;
     private EmptyDrawable emptyBackground = new EmptyDrawable();
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (clearButton != null && event.getX() > getWidth() - clearButton.getBounds().width()) {
+            clearButton.setState(getDrawableState());
+        }
+        if (showPasswordButton != null && event.getX() > getWidth() - showPasswordButton.getBounds().width()) {
+            showPasswordButton.setState(getDrawableState());
+        }
+        return super.onTouchEvent(event);
+    }
 
     @Override
     public boolean dispatchTouchEvent(@NonNull MotionEvent event) {
@@ -1068,6 +1245,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
         outRect.set(getLeft() - touchMargin.left, getTop() - touchMargin.top, getRight() + touchMargin.right, getBottom() + touchMargin.bottom);
     }
 
+
     // -------------------------------
     // state animators
     // -------------------------------
@@ -1086,8 +1264,13 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
             rippleDrawable.setState(getDrawableState());
         if (stateAnimator != null)
             stateAnimator.setState(getDrawableState());
-        if (tint != null)
-            tint.setState(getDrawableState());
+        ColorStateList textColors = getTextColors();
+        if (textColors instanceof AnimatedColorStateList)
+            ((AnimatedColorStateList) textColors).setState(getDrawableState());
+        if (tint != null && tint instanceof AnimatedColorStateList)
+            ((AnimatedColorStateList) tint).setState(getDrawableState());
+        if (backgroundTint!= null && backgroundTint instanceof AnimatedColorStateList)
+            ((AnimatedColorStateList) backgroundTint).setState(getDrawableState());
     }
 
     @Override
@@ -1101,7 +1284,7 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
     // animations
     // -------------------------------
 
-    private AnimUtils.Style inAnim, outAnim;
+    private AnimUtils.Style inAnim = AnimUtils.Style.None, outAnim = AnimUtils.Style.None;
     private Animator animator;
 
     public void setVisibility(final int visibility) {
@@ -1166,20 +1349,36 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
     // tint
     // -------------------------------
 
-    AnimatedColorStateList tint;
+    ColorStateList tint;
+    PorterDuff.Mode tintMode;
+    ColorStateList backgroundTint;
+    PorterDuff.Mode backgroundTintMode;
+    boolean animateColorChanges;
+    ValueAnimator.AnimatorUpdateListener tintAnimatorListener = new ValueAnimator.AnimatorUpdateListener() {
+        @Override
+        public void onAnimationUpdate(ValueAnimator animation) {
+            updateTint();
+            ViewCompat.postInvalidateOnAnimation(EditText.this);
+        }
+    };
+    ValueAnimator.AnimatorUpdateListener backgroundTintAnimatorListener = new ValueAnimator.AnimatorUpdateListener() {
+        @Override
+        public void onAnimationUpdate(ValueAnimator animation) {
+            updateBackgroundTint();
+            ViewCompat.postInvalidateOnAnimation(EditText.this);
+        }
+    };
+    ValueAnimator.AnimatorUpdateListener textColorAnimatorListener = new ValueAnimator.AnimatorUpdateListener() {
+        @Override
+        public void onAnimationUpdate(ValueAnimator animation) {
+            setHintTextColor(getHintTextColors());
+        }
+    };
 
     @Override
     public void setTint(ColorStateList list) {
-        if (list != null) {
-            tint = AnimatedColorStateList.fromList(list, this, new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    postInvalidate();
-                }
-            });
-        } else {
-            tint = null;
-        }
+        this.tint = animateColorChanges && !(list instanceof AnimatedColorStateList) ? AnimatedColorStateList.fromList(list, tintAnimatorListener) : list;
+        updateTint();
     }
 
     @Override
@@ -1194,6 +1393,87 @@ public class EditText extends android.widget.EditText implements RippleView, Tou
     @Override
     public ColorStateList getTint() {
         return tint;
+    }
+
+    private void updateTint() {
+        Drawable[] drawables = getCompoundDrawables();
+        if (tint != null && tintMode != null) {
+            int color = tint.getColorForState(getDrawableState(), tint.getDefaultColor());
+            for (Drawable d : drawables)
+                if (d != null)
+                    d.setColorFilter(new PorterDuffColorFilter(color, tintMode));
+        } else {
+            for (Drawable d : drawables)
+                if (d != null)
+                    d.setColorFilter(null);
+        }
+    }
+
+    @Override
+    public void setTintMode(@NonNull PorterDuff.Mode mode) {
+        this.tintMode = mode;
+        updateTint();
+    }
+
+    @Override
+    public PorterDuff.Mode getTintMode() {
+        return tintMode;
+    }
+
+    @Override
+    public void setBackgroundTint(ColorStateList list) {
+        this.backgroundTint = animateColorChanges && !(list instanceof AnimatedColorStateList) ? AnimatedColorStateList.fromList(list, backgroundTintAnimatorListener) : list;
+        updateBackgroundTint();
+    }
+
+    @Override
+    public void setBackgroundTint(int color) {
+        if (color == 0) {
+            setBackgroundTint(new DefaultColorStateList(getContext()));
+        } else {
+            setBackgroundTint(ColorStateList.valueOf(color));
+        }
+    }
+
+    @Override
+    public ColorStateList getBackgroundTint() {
+        return backgroundTint;
+    }
+
+    private void updateBackgroundTint() {
+        if (getBackground() == null)
+            return;
+        if (backgroundTint != null && backgroundTintMode != null) {
+            int color = backgroundTint.getColorForState(getDrawableState(), backgroundTint.getDefaultColor());
+            getBackground().setColorFilter(new PorterDuffColorFilter(color, backgroundTintMode));
+        } else {
+            getBackground().setColorFilter(null);
+        }
+    }
+
+    @Override
+    public void setBackgroundTintMode(@NonNull PorterDuff.Mode mode) {
+        this.backgroundTintMode = mode;
+        updateBackgroundTint();
+    }
+
+    @Override
+    public PorterDuff.Mode getBackgroundTintMode() {
+        return backgroundTintMode;
+    }
+
+    public boolean isAnimateColorChangesEnabled() {
+        return animateColorChanges;
+    }
+
+    public void setAnimateColorChangesEnabled(boolean animateColorChanges) {
+        this.animateColorChanges = animateColorChanges;
+        if (tint != null && !(tint instanceof AnimatedColorStateList))
+            setTint(AnimatedColorStateList.fromList(tint, tintAnimatorListener));
+        if (backgroundTint != null && !(backgroundTint instanceof AnimatedColorStateList))
+            setBackgroundTint(AnimatedColorStateList.fromList(backgroundTint, backgroundTintAnimatorListener));
+        if (!(getTextColors() instanceof AnimatedColorStateList))
+            setTextColor(AnimatedColorStateList.fromList(getTextColors(), textColorAnimatorListener));
     }
 
 
