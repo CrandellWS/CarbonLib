@@ -1,40 +1,29 @@
 package carbon.widget;
 
-import android.app.Activity;
+import android.annotation.TargetApi;
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.res.TypedArray;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.support.annotation.ColorInt;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.StringRes;
-import android.support.annotation.StyleRes;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.animation.Animation;
+import android.view.animation.Transformation;
 
 import com.nineoldandroids.animation.Animator;
 import com.nineoldandroids.animation.AnimatorListenerAdapter;
 import com.nineoldandroids.animation.ValueAnimator;
-import com.nineoldandroids.view.ViewHelper;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import carbon.Carbon;
 import carbon.R;
@@ -42,10 +31,9 @@ import carbon.animation.AnimUtils;
 import carbon.animation.AnimatedView;
 import carbon.animation.StateAnimator;
 import carbon.drawable.EmptyDrawable;
-import carbon.drawable.ripple.RippleDrawable;
-import carbon.drawable.ripple.RippleView;
-import carbon.internal.ElevationComparator;
-import carbon.internal.MatrixHelper;
+import carbon.drawable.RippleDrawable;
+import carbon.drawable.RippleView;
+import carbon.internal.TypefaceUtils;
 import carbon.shadow.Shadow;
 import carbon.shadow.ShadowGenerator;
 import carbon.shadow.ShadowShape;
@@ -55,269 +43,22 @@ import static com.nineoldandroids.view.animation.AnimatorProxy.NEEDS_PROXY;
 import static com.nineoldandroids.view.animation.AnimatorProxy.wrap;
 
 /**
- * Created by Marcin on 2014-12-13.
+ * Created by Marcin on 2014-11-07.
+ * <p/>
+ * Carbon version of android.widget.Button. Supports shadows, ripples, animations and all other material features.
  */
-public class Toolbar extends android.support.v7.widget.Toolbar implements ShadowView, RippleView, TouchMarginView, StateAnimatorView, AnimatedView, InsetView, CornerView {
-    private ViewGroup content;
-    private ImageView icon;
-    private TextView title;
+public class AppBarLayout extends android.support.design.widget.AppBarLayout implements ShadowView, RippleView, TouchMarginView, StateAnimatorView, AnimatedView, CornerView {
+    protected Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
-    public Toolbar(Context context) {
-        super(context, null, R.attr.toolbarStyle);
-        initToolbar(null, R.attr.toolbarStyle);
+
+    public AppBarLayout(Context context) {
+        super(context);
     }
 
-    public Toolbar(Context context, AttributeSet attrs) {
-        super(context, attrs, R.attr.toolbarStyle);
-        initToolbar(attrs, R.attr.toolbarStyle);
+    public AppBarLayout(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        Carbon.initElevation(this, attrs, 0);
     }
-
-    public Toolbar(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        initToolbar(attrs, defStyleAttr);
-    }
-
-    private static Activity scanForActivity(Context cont) {
-        if (cont == null)
-            return null;
-        else if (cont instanceof Activity)
-            return (Activity)cont;
-        else if (cont instanceof ContextWrapper)
-            return scanForActivity(((ContextWrapper)cont).getBaseContext());
-
-        return null;
-    }
-
-    private void initToolbar(AttributeSet attrs, int defStyleAttr) {
-        inflate(getContext(), R.layout.carbon_toolbar, this);
-        super.setNavigationIcon(null);
-        super.setTitle(null);
-        content = (ViewGroup) findViewById(R.id.carbon_toolbarContent);
-        title = (TextView) findViewById(R.id.carbon_toolbarTitle);
-        icon = (ImageView) findViewById(R.id.carbon_toolbarIcon);
-
-        icon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                scanForActivity(getContext()).onBackPressed();
-            }
-        });
-
-        TypedArray a = getContext().obtainStyledAttributes(attrs, R.styleable.Toolbar, defStyleAttr, 0);
-        setText(a.getString(R.styleable.Toolbar_android_text));
-        int iconRes = a.getResourceId(R.styleable.Toolbar_carbon_icon, 0);
-        if (iconRes != 0) {
-            setIcon(iconRes);
-        } else {
-            setIconVisible(false);
-        }
-        int color = a.getColor(R.styleable.Toolbar_android_background, 0);
-        setBackgroundColor(color);
-        a.recycle();
-
-        Carbon.initElevation(this, attrs, defStyleAttr);
-    }
-
-    @Override
-    public void addView(@NonNull View child) {
-        if (content != null) {
-            content.addView(child);
-        } else {
-            super.addView(child);
-        }
-    }
-
-    @Override
-    public void addView(@NonNull View child, int index) {
-        if (content != null) {
-            content.addView(child, index);
-        } else {
-            super.addView(child, index);
-        }
-    }
-
-    @Override
-    public void addView(@NonNull View child, int index, ViewGroup.LayoutParams params) {
-        if (content != null) {
-            content.addView(child, index, params);
-        } else {
-            super.addView(child, index, params);
-        }
-    }
-
-    @Override
-    public void addView(@NonNull View child, ViewGroup.LayoutParams params) {
-        if (content != null) {
-            content.addView(child, params);
-        } else {
-            super.addView(child, params);
-        }
-    }
-
-    @Override
-    public void addView(@NonNull View child, int width, int height) {
-        if (content != null) {
-            content.addView(child, width, height);
-        } else {
-            super.addView(child, width, height);
-        }
-    }
-
-    @Override
-    public void setTitle(@StringRes int resId) {
-        setTitle(getResources().getString(resId));
-    }
-
-    @Override
-    public void setTitle(CharSequence text) {
-        if (text != null) {
-            title.setText(text);
-            title.setVisibility(View.VISIBLE);
-        } else {
-            title.setVisibility(View.GONE);
-        }
-    }
-
-    @Override
-    public void setTitleTextAppearance(Context context, @StyleRes int resId) {
-        title.setTextAppearance(context, resId);
-    }
-
-    @Override
-    public void setTitleTextColor(@ColorInt int color) {
-        title.setTextColor(color);
-    }
-
-    @Deprecated
-    public void setText(String text) {
-        if (text != null) {
-            title.setText(text);
-            title.setVisibility(View.VISIBLE);
-        } else {
-            title.setVisibility(View.GONE);
-        }
-    }
-
-    @Deprecated
-    public void setText(int resId) {
-        setText(getResources().getString(resId));
-    }
-
-    @Deprecated
-    public String getText() {
-        return (String) title.getText();
-    }
-
-    public TextView getTitleView() {
-        return title;
-    }
-
-    public void setIcon(int iconRes) {
-        icon.setImageResource(iconRes);
-        setIconVisible(iconRes != 0);
-    }
-
-    public void setIcon(Drawable drawable) {
-        icon.setImageDrawable(drawable);
-        setIconVisible(drawable != null);
-    }
-
-    public void setIcon(Bitmap bitmap) {
-        icon.setImageBitmap(bitmap);
-        setIconVisible(bitmap != null);
-    }
-
-    public Drawable getIcon() {
-        return icon.getDrawable();
-    }
-
-    public View getIconView() {
-        return icon;
-    }
-
-    public void setIconVisible(boolean visible) {
-        icon.setVisibility(visible ? VISIBLE : GONE);
-    }
-
-
-    List<View> views;
-    private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-
-    @Override
-    protected void dispatchDraw(@NonNull Canvas canvas) {
-        views = new ArrayList<>();
-        for (int i = 0; i < getChildCount(); i++)
-            views.add(getChildAt(i));
-        Collections.sort(views, new ElevationComparator());
-
-        super.dispatchDraw(canvas);
-        if (rippleDrawable != null && rippleDrawable.getStyle() == RippleDrawable.Style.Over)
-            rippleDrawable.draw(canvas);
-        if (insetColor != 0) {
-            paint.setColor(insetColor);
-            paint.setAlpha(255);
-            if (insetLeft != 0)
-                canvas.drawRect(0, 0, insetLeft, getHeight(), paint);
-            if (insetTop != 0)
-                canvas.drawRect(0, 0, getWidth(), insetTop, paint);
-            if (insetRight != 0)
-                canvas.drawRect(getWidth() - insetRight, 0, getWidth(), getHeight(), paint);
-            if (insetBottom != 0)
-                canvas.drawRect(0, getHeight() - insetBottom, getWidth(), getHeight(), paint);
-        }
-    }
-
-    @Override
-    protected boolean drawChild(@NonNull Canvas canvas, @NonNull View child, long drawingTime) {
-        if (!child.isShown())
-            return super.drawChild(canvas, child, drawingTime);
-
-        if (!isInEditMode() && child instanceof ShadowView && Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT_WATCH) {
-            ShadowView shadowView = (ShadowView) child;
-            Shadow shadow = shadowView.getShadow();
-            if (shadow != null) {
-                paint.setAlpha((int) (ShadowGenerator.ALPHA * ViewHelper.getAlpha(child)));
-
-                float childElevation = shadowView.getElevation() + shadowView.getTranslationZ();
-
-                int saveCount = canvas.save(Canvas.MATRIX_SAVE_FLAG);
-                canvas.translate(0, childElevation / 2);
-                canvas.translate(child.getLeft(), child.getTop());
-
-                Matrix matrix = MatrixHelper.getMatrix(child);
-                canvas.concat(matrix);
-                shadow.draw(canvas, child, paint);
-                canvas.restoreToCount(saveCount);
-            }
-        }
-
-        if (child instanceof RippleView) {
-            RippleView rippleView = (RippleView) child;
-            RippleDrawable rippleDrawable = rippleView.getRippleDrawable();
-            if (rippleDrawable != null && rippleDrawable.getStyle() == RippleDrawable.Style.Borderless) {
-                int saveCount = canvas.save(Canvas.MATRIX_SAVE_FLAG);
-                canvas.translate(
-                        child.getLeft(),
-                        child.getTop());
-                rippleDrawable.draw(canvas);
-                canvas.restoreToCount(saveCount);
-            }
-        }
-
-        return super.drawChild(canvas, child, drawingTime);
-    }
-
-    @Override
-    protected int getChildDrawingOrder(int childCount, int child) {
-        return views != null ? indexOfChild(views.get(child)) : child;
-    }
-
-    protected boolean isTransformedTouchPointInView(float x, float y, View child, PointF outLocalPoint) {
-        final Rect frame = new Rect();
-        child.getHitRect(frame);
-        return frame.contains((int) x, (int) y);
-    }
-
 
     // -------------------------------
     // corners
@@ -327,10 +68,20 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
     private Path cornersMask;
     private static PorterDuffXfermode pdMode = new PorterDuffXfermode(PorterDuff.Mode.CLEAR);
 
+    /**
+     * Gets the corner radius. If corner radius is equal to 0, rounded corners are turned off. Shadows work faster when corner radius is less than 2.5dp.
+     *
+     * @return corner radius, equal to or greater than 0.
+     */
     public int getCornerRadius() {
         return cornerRadius;
     }
 
+    /**
+     * Sets the corner radius. If corner radius is equal to 0, rounded corners are turned off. Shadows work faster when corner radius is less than 2.5dp.
+     *
+     * @param cornerRadius
+     */
     public void setCornerRadius(int cornerRadius) {
         this.cornerRadius = cornerRadius;
         invalidateShadow();
@@ -377,6 +128,8 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
             int saveCount = canvas.saveLayer(0, 0, getWidth(), getHeight(), null, Canvas.ALL_SAVE_FLAG);
 
             super.draw(canvas);
+            if (rippleDrawable != null && rippleDrawable.getStyle() == RippleDrawable.Style.Over)
+                rippleDrawable.draw(canvas);
 
             paint.setXfermode(pdMode);
             canvas.drawPath(cornersMask, paint);
@@ -385,6 +138,8 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
             paint.setXfermode(null);
         } else {
             super.draw(canvas);
+            if (rippleDrawable != null && rippleDrawable.getStyle() == RippleDrawable.Style.Over)
+                rippleDrawable.draw(canvas);
         }
     }
 
@@ -395,19 +150,29 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
 
     private RippleDrawable rippleDrawable;
     private EmptyDrawable emptyBackground = new EmptyDrawable();
+    private Transformation t = new Transformation();
 
     @Override
     public boolean dispatchTouchEvent(@NonNull MotionEvent event) {
+        Animation a = getAnimation();
+        if (a != null) {
+            a.getTransformation(event.getEventTime(), t);
+            float[] loc = new float[]{event.getX(), event.getY()};
+            t.getMatrix().mapPoints(loc);
+            event.setLocation(loc[0], loc[1]);
+        }
         if (rippleDrawable != null && event.getAction() == MotionEvent.ACTION_DOWN)
             rippleDrawable.setHotspot(event.getX(), event.getY());
         return super.dispatchTouchEvent(event);
     }
+
 
     @Override
     public RippleDrawable getRippleDrawable() {
         return rippleDrawable;
     }
 
+    @Override
     public void setRippleDrawable(RippleDrawable newRipple) {
         if (rippleDrawable != null) {
             rippleDrawable.setCallback(null);
@@ -567,13 +332,14 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
         return elevation;
     }
 
+    @Override
     public synchronized void setElevation(float elevation) {
         if (elevation == this.elevation)
             return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             super.setElevation(elevation);
         this.elevation = elevation;
-        if (getParent() != null && getParent() instanceof View)
+        if (getParent() != null)
             ((View) getParent()).postInvalidate();
     }
 
@@ -588,7 +354,7 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             super.setTranslationZ(translationZ);
         this.translationZ = translationZ;
-        if (getParent() != null && getParent() instanceof View)
+        if (getParent() != null)
             ((View) getParent()).postInvalidate();
     }
 
@@ -604,6 +370,7 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
     @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
+        setTranslationZ(enabled ? 0 : -elevation);
     }
 
     @Override
@@ -669,6 +436,7 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
         outRect.set(getLeft() - touchMargin.left, getTop() - touchMargin.top, getRight() + touchMargin.right, getBottom() + touchMargin.bottom);
     }
 
+
     // -------------------------------
     // state animators
     // -------------------------------
@@ -694,7 +462,7 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
     // animations
     // -------------------------------
 
-    private AnimUtils.Style inAnim = AnimUtils.Style.None, outAnim = AnimUtils.Style.None;
+    private AnimUtils.Style inAnim, outAnim;
     private Animator animator;
 
     public void setVisibility(final int visibility) {
@@ -722,7 +490,7 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
                 @Override
                 public void onAnimationEnd(Animator a) {
                     if (((ValueAnimator) a).getAnimatedFraction() == 1)
-                        Toolbar.super.setVisibility(visibility);
+                        AppBarLayout.super.setVisibility(visibility);
                     animator = null;
                     clearAnimation();
                 }
@@ -752,122 +520,6 @@ public class Toolbar extends android.support.v7.widget.Toolbar implements Shadow
 
     public void setInAnimation(AnimUtils.Style inAnim) {
         this.inAnim = inAnim;
-    }
-
-
-    // -------------------------------
-    // insets
-    // -------------------------------
-
-    int insetLeft = INSET_NULL, insetTop = INSET_NULL, insetRight = INSET_NULL, insetBottom = INSET_NULL;
-    int insetColor;
-    private OnInsetsChangedListener onInsetsChangedListener;
-
-    public int getInsetColor() {
-        return insetColor;
-    }
-
-    public void setInsetColor(int insetsColor) {
-        this.insetColor = insetsColor;
-    }
-
-    public void setInset(int left, int top, int right, int bottom) {
-        insetLeft = left;
-        insetTop = top;
-        insetRight = right;
-        insetBottom = bottom;
-    }
-
-    public int getInsetLeft() {
-        return insetLeft;
-    }
-
-    public void setInsetLeft(int insetLeft) {
-        this.insetLeft = insetLeft;
-    }
-
-    public int getInsetTop() {
-        return insetTop;
-    }
-
-    public void setInsetTop(int insetTop) {
-        this.insetTop = insetTop;
-    }
-
-    public int getInsetRight() {
-        return insetRight;
-    }
-
-    public void setInsetRight(int insetRight) {
-        this.insetRight = insetRight;
-    }
-
-    public int getInsetBottom() {
-        return insetBottom;
-    }
-
-    public void setInsetBottom(int insetBottom) {
-        this.insetBottom = insetBottom;
-    }
-
-    @Override
-    protected boolean fitSystemWindows(@NonNull Rect insets) {
-        if (insetLeft == INSET_NULL)
-            insetLeft = insets.left;
-        if (insetTop == INSET_NULL)
-            insetTop = insets.top;
-        if (insetRight == INSET_NULL)
-            insetRight = insets.right;
-        if (insetBottom == INSET_NULL)
-            insetBottom = insets.bottom;
-        insets.set(insetLeft, insetTop, insetRight, insetBottom);
-        if (onInsetsChangedListener != null)
-            onInsetsChangedListener.onInsetsChanged();
-        postInvalidate();
-        return super.fitSystemWindows(insets);
-    }
-
-    public void setOnInsetsChangedListener(OnInsetsChangedListener onInsetsChangedListener) {
-        this.onInsetsChangedListener = onInsetsChangedListener;
-    }
-
-
-    // -------------------------------
-    // ViewGroup utils
-    // -------------------------------
-
-    public List<View> findViewsById(int id) {
-        List<View> result = new ArrayList<>();
-        List<ViewGroup> groups = new ArrayList<>();
-        groups.add(this);
-        while (!groups.isEmpty()) {
-            ViewGroup group = groups.remove(0);
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View child = group.getChildAt(i);
-                if (child.getId() == id)
-                    result.add(child);
-                if (child instanceof ViewGroup)
-                    groups.add((ViewGroup) child);
-            }
-        }
-        return result;
-    }
-
-    public List<View> findViewsWithTag(Object tag) {
-        List<View> result = new ArrayList<>();
-        List<ViewGroup> groups = new ArrayList<>();
-        groups.add(this);
-        while (!groups.isEmpty()) {
-            ViewGroup group = groups.remove(0);
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View child = group.getChildAt(i);
-                if (tag.equals(child.getTag()))
-                    result.add(child);
-                if (child instanceof ViewGroup)
-                    groups.add((ViewGroup) child);
-            }
-        }
-        return result;
     }
 
 
