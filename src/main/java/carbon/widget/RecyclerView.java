@@ -61,6 +61,7 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
     private float prevY;
     private int overscrollMode;
     private boolean clipToPadding;
+    long prevScroll = 0;
 
     public RecyclerView(Context context) {
         super(context, null, R.attr.carbon_recyclerViewStyle);
@@ -135,7 +136,9 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
                 }
                 if (drag) {
                     final int oldY = computeVerticalScrollOffset();
-                    final int range = computeVerticalScrollRange() - getHeight();
+                    int range = computeVerticalScrollRange() - getHeight();
+                    if (header != null)
+                        range += header.getHeight();
                     boolean canOverscroll = overscrollMode == ViewCompat.OVER_SCROLL_ALWAYS ||
                             (overscrollMode == ViewCompat.OVER_SCROLL_IF_CONTENT_SCROLLS && range > 0);
 
@@ -170,6 +173,35 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
         prevY = ev.getY();
 
         return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public void onScrolled(int dx, int dy) {
+        super.onScrolled(dx, dy);
+        if (drag || topGlow == null)
+            return;
+        int range = computeVerticalScrollRange() - getHeight();
+        if (header != null)
+            range += header.getHeight();
+        boolean canOverscroll = overscrollMode == ViewCompat.OVER_SCROLL_ALWAYS ||
+                (overscrollMode == ViewCompat.OVER_SCROLL_IF_CONTENT_SCROLLS && range > 0);
+
+        if (canOverscroll) {
+            long t = System.currentTimeMillis();
+            /*int velx = (int) (dx * 1000.0f / (t - prevScroll));
+            if (computeHorizontalScrollOffset() == 0 && dx < 0) {
+                leftGlow.onAbsorb(-velx);
+            } else if (computeHorizontalScrollOffset() == computeHorizontalScrollRange() - getWidth() && dx > 0) {
+                rightGlow.onAbsorb(velx);
+            }*/
+            int vely = (int) (dy * 1000.0f / (t - prevScroll));
+            if (computeVerticalScrollOffset() == 0 && dy < 0) {
+                topGlow.onAbsorb(-vely);
+            } else if (computeVerticalScrollOffset() == range && dy > 0) {
+                bottomGlow.onAbsorb(vely);
+            }
+            prevScroll = t;
+        }
     }
 
     @Override
@@ -211,39 +243,6 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
             // Froyo
         }
         this.overscrollMode = mode;
-    }
-
-    @Override
-    public void draw(Canvas canvas) {
-        super.draw(canvas);
-        if (topGlow != null) {
-            final int scrollY = computeVerticalScrollOffset();
-            if (!topGlow.isFinished()) {
-                final int restoreCount = canvas.save();
-                final int width = getWidth() - getPaddingLeft() - getPaddingRight();
-
-                canvas.translate(getPaddingLeft(), Math.min(0, scrollY));
-                topGlow.setSize(width, getHeight());
-                if (topGlow.draw(canvas)) {
-                    postInvalidate();
-                }
-                canvas.restoreToCount(restoreCount);
-            }
-            if (!bottomGlow.isFinished()) {
-                final int restoreCount = canvas.save();
-                final int width = getWidth() - getPaddingLeft() - getPaddingRight();
-                final int height = getHeight();
-
-                canvas.translate(-width + getPaddingLeft(),
-                        height);
-                canvas.rotate(180, width, 0);
-                bottomGlow.setSize(width, height);
-                if (bottomGlow.draw(canvas)) {
-                    postInvalidate();
-                }
-                canvas.restoreToCount(restoreCount);
-            }
-        }
     }
 
     @Override
@@ -412,7 +411,7 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
         this.animateColorChanges = animateColorChanges;
         if (tint != null && !(tint instanceof AnimatedColorStateList))
             setTint(AnimatedColorStateList.fromList(tint, tintAnimatorListener));
-        if (backgroundTint!= null && !(backgroundTint instanceof AnimatedColorStateList))
+        if (backgroundTint != null && !(backgroundTint instanceof AnimatedColorStateList))
             setBackgroundTint(AnimatedColorStateList.fromList(backgroundTint, backgroundTintAnimatorListener));
     }
 
@@ -485,6 +484,34 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
             canvas.restoreToCount(saveCount);
         } else {
             super.dispatchDraw(canvas);
+        }
+        if (topGlow != null) {
+            final int scrollY = computeVerticalScrollOffset();
+            if (!topGlow.isFinished()) {
+                final int restoreCount = canvas.save();
+                final int width = getWidth() - getPaddingLeft() - getPaddingRight();
+
+                canvas.translate(getPaddingLeft(), Math.min(0, scrollY));
+                topGlow.setSize(width, getHeight());
+                if (topGlow.draw(canvas)) {
+                    postInvalidate();
+                }
+                canvas.restoreToCount(restoreCount);
+            }
+            if (!bottomGlow.isFinished()) {
+                final int restoreCount = canvas.save();
+                final int width = getWidth() - getPaddingLeft() - getPaddingRight();
+                final int height = getHeight();
+
+                canvas.translate(-width + getPaddingLeft(),
+                        height);
+                canvas.rotate(180, width, 0);
+                bottomGlow.setSize(width, height);
+                if (bottomGlow.draw(canvas)) {
+                    postInvalidate();
+                }
+                canvas.restoreToCount(restoreCount);
+            }
         }
     }
 
@@ -665,7 +692,7 @@ public class RecyclerView extends android.support.v7.widget.RecyclerView impleme
                 }
                 c.save(Canvas.CLIP_SAVE_FLAG);
                 c.clipRect(left, top, right, bottom);
-                drawable.setAlpha((int) (ViewHelper.getAlpha(child)*255));
+                drawable.setAlpha((int) (ViewHelper.getAlpha(child) * 255));
                 drawable.setBounds(left, top, right, bottom);
                 drawable.draw(c);
                 c.restore();

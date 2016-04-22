@@ -42,6 +42,7 @@ public class HorizontalScrollView extends android.widget.HorizontalScrollView im
     private boolean drag = true;
     private float prevX;
     private int overscrollMode;
+    long prevScroll = 0;
 
     public static final int OVER_SCROLL_ALWAYS = 0;
     public static final int OVER_SCROLL_IF_CONTENT_SCROLLS = 1;
@@ -86,16 +87,6 @@ public class HorizontalScrollView extends android.widget.HorizontalScrollView im
         initScrollbars();
     }
 
-    private int getScrollRange() {
-        int scrollRange = 0;
-        if (getChildCount() > 0) {
-            View child = getChildAt(0);
-            scrollRange = Math.max(0,
-                    child.getWidth() - (getWidth() - getPaddingRight() - getPaddingLeft()));
-        }
-        return scrollRange;
-    }
-
     @Override
     public void draw(@NonNull Canvas canvas) {
         super.draw(canvas);
@@ -120,7 +111,7 @@ public class HorizontalScrollView extends android.widget.HorizontalScrollView im
 
                 canvas.rotate(90);
                 canvas.translate(-getPaddingTop(),
-                        -(Math.max(getScrollRange(), scrollX) + width));
+                        -(Math.max(computeHorizontalScrollRange() - getWidth(), scrollX) + width));
                 rightGlow.setSize(height, width);
                 if (rightGlow.draw(canvas)) {
                     postInvalidate();
@@ -150,7 +141,7 @@ public class HorizontalScrollView extends android.widget.HorizontalScrollView im
                 }
                 if (drag) {
                     final int oldX = getScrollX();
-                    final int range = getScrollRange();
+                    final int range = computeHorizontalScrollRange() - getWidth();
                     boolean canOverscroll = overscrollMode == OVER_SCROLL_ALWAYS ||
                             (overscrollMode == OVER_SCROLL_IF_CONTENT_SCROLLS && range > 0);
 
@@ -185,6 +176,27 @@ public class HorizontalScrollView extends android.widget.HorizontalScrollView im
         prevX = ev.getX();
 
         return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    protected void onScrollChanged(int x, int y, int prevX, int prevY) {
+        super.onScrollChanged(x, y, prevX, prevY);
+        if (drag || leftGlow == null)
+            return;
+        final int range = computeHorizontalScrollRange() - getWidth();
+        boolean canOverscroll = overscrollMode == OVER_SCROLL_ALWAYS ||
+                (overscrollMode == OVER_SCROLL_IF_CONTENT_SCROLLS && range > 0);
+        if (canOverscroll) {
+            int dx = x - prevX;
+            long t = System.currentTimeMillis();
+            int velx = (int) (dx * 1000.0f / (t - prevScroll));
+            if (computeHorizontalScrollOffset() == 0 && dx < 0) {
+                leftGlow.onAbsorb(-velx);
+            } else if (computeHorizontalScrollOffset() == range && dx > 0) {
+                rightGlow.onAbsorb(velx);
+            }
+            prevScroll = t;
+        }
     }
 
     @Override
