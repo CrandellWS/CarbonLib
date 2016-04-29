@@ -11,7 +11,9 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
+import android.view.animation.BaseInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
 
 import com.nineoldandroids.animation.Animator;
 import com.nineoldandroids.animation.AnimatorListenerAdapter;
@@ -119,7 +121,7 @@ public class TransitionLayout extends android.widget.FrameLayout {
         dist = (float) Math.max(dist, Math.sqrt((getWidth() - x) * (getWidth() - x) + (getHeight() - y) * (getHeight() - y)));
         animator = ValueAnimator.ofFloat(inAnimation ? 0 : dist, inAnimation ? dist : 0);
         animator.setDuration(duration);
-        animator.setInterpolator(inAnimation ? new AccelerateInterpolator() : new DecelerateInterpolator());
+        animator.setInterpolator(inAnimation ? (Interpolator)new AccelerateInterpolator() : (Interpolator)new DecelerateInterpolator());
         animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
