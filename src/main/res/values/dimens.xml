@@ -29,7 +29,7 @@
     <dimen name="carbon_bottomBarActiveTextSize">14sp</dimen>
     <dimen name="carbon_bottomBarInactiveTextSize">12sp</dimen>
 
-    <dimen name="carbon_tooltipHeight">32dp</dimen>
+    <dimen name="carbon_tooltipHeight">36dp</dimen>
     <dimen name="carbon_tooltipPadding">16dp</dimen>
     <dimen name="carbon_tooltipTextSize">14dp</dimen>
 
@@ -87,4 +87,13 @@
     <dimen name="carbon_navigationBarHeight">48dp</dimen>
 
     <dimen name="carbon_grid8">8dp</dimen>
+
+
+    <dimen name="maxTextSize">64dp</dimen>
+    <dimen name="maxAnswerSize">56dp</dimen>
+    <dimen name="maxAnswerPad">8dp</dimen>
+    <dimen name="maxAnswerMargin">-8dp</dimen>
+    <dimen name="footerbarTextSize">24sp</dimen>
+    <dimen name="footerbarHeight">56dp</dimen>
+
 </resources>
