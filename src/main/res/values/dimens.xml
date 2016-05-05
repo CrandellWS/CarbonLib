@@ -90,9 +90,9 @@
 
 
     <dimen name="maxTextSize">64dp</dimen>
-    <dimen name="maxAnswerSize">56dp</dimen>
-    <dimen name="maxAnswerPad">8dp</dimen>
-    <dimen name="maxAnswerMargin">-8dp</dimen>
+    <dimen name="maxAnswerSize">64dp</dimen>
+    <dimen name="maxAnswerPad">0dp</dimen>
+    <dimen name="maxAnswerMargin">0dp</dimen>
     <dimen name="footerbarTextSize">24sp</dimen>
     <dimen name="footerbarHeight">56dp</dimen>
 
